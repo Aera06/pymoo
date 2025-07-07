@@ -1,0 +1,48 @@
+from pymoo.core.problem import ElementwiseProblem
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.optimize import minimize
+from pymoo.visualization.scatter import Scatter
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+import numpy as np
+
+# Define the custom problem for welding optimization
+class GMAWeldingProblem(ElementwiseProblem):
+    def __init__(self):
+        super().__init__(n_var=2,
+                         n_obj=2,
+                         n_constr=0,
+                         xl=np.array([-1.0, -1.0]),
+                         xu=np.array([1.0, 1.0]))
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        x1, x2 = x
+        # Regression model for mean (μ)
+        mu = 3.0422 + 0.4967*x1 - 0.4367*x2 + 0.0567*x1**2 - 0.0033*x2**2
+        # Regression model for standard deviation (σ)
+        sigma = 0.4813 + 0.1174*x1 + 0.0515*x2 - 0.1515*x1**2 + 0.0115*x2**2 + 0.0462*x1*x2
+        # Objectives: minimize |4 - μ| and σ
+        out["F"] = [abs(4 - mu), sigma]
+
+# Define the problem
+problem = GMAWeldingProblem()
+
+# NSGA-II setup
+algorithm = NSGA2(
+    pop_size=80,
+    sampling=FloatRandomSampling(),
+    crossover=SBX(prob=0.9, eta=15),
+    mutation=PM(eta=20),
+    eliminate_duplicates=True
+)
+
+# Run the optimization
+res = minimize(problem,
+               algorithm,
+               ('n_gen', 100),
+               seed=1,
+               verbose=True)
+
+# Show the Pareto front
+Scatter(title="Pareto Front: Minimize |4 - μ| and σ").add(res.F).show()
